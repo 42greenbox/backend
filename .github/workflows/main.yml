@@ -1,0 +1,40 @@
+name: Deploy master branch
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: set env
+        run: |
+          echo "CLIENT_ID=${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+          AWS_PROFILE=${{secrets.AWS_PROFILE}}
+          REDIRECT_URI=${{secrets.REDIRECT_URI}}
+          MAIN_URL=${{secrets.MAIN_URL}}
+          AWS_ACCESS_KEY_ID_S3=${{secrets.AWS_ACCESS_KEY_ID_S3}}
+          AWS_SECRET_ACCESS_KEY_S3=${{secrets.AWS_SECRET_ACCESS_KEY_S3}}
+          VAPID_PUBLIC_KEY=${{secrets.VAPID_PUBLIC_KEY}}
+          VAPID_PRIVATE_KEY=${{secrets.VAPID_PRIVATE_KEY}}" > .env.dev
+          source .env.dev
+      - run: npm ci
+      - run: ls -la
+      - name: install serverless
+        run: npm install -g serverless
+      - name: set aws key
+        run: sls config credentials --provider aws --key ${{ secrets.AWS_ACCESS_KEY_ID }} --secret ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: deploy
+        run: sls deploy -s dev

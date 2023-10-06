@@ -1,0 +1,213 @@
+service: aws-node-http-api-project
+frameworkVersion: "3"
+useDotenv: true
+plugins:
+  - serverless-auto-swagger
+  # - serverless-webpack
+
+custom:
+  autoswagger:
+    title: "greenbox"
+    apiType: "http"
+    generateSwaggerOnDeploy: false
+
+resources:
+  Resources:
+    user:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: user
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    storage:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: storage
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: item_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+          - AttributeName: item_id
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    item:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: item
+        AttributeDefinitions:
+          - AttributeName: item_id
+            AttributeType: S
+          - AttributeName: item_name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: item_name
+            KeyType: HASH
+          - AttributeName: item_id
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    ledger:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ledger
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: N
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+          - AttributeName: created_at
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-northeast-2
+  stage: ${opt:stage, "dev"}
+  profile: ${env:AWS_PROFILE}
+  iam:
+    role:
+      statements: # IAM 역할에 대한 권한 정의
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource: "*"
+  httpApi:
+    authorizers:
+      customAuthorizer:
+        type: request
+        functionName: auth
+    cors:
+      allowedOrigins:
+        - https://42greenbox.com
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - x-requested-with
+      allowedMethods:
+        - GET
+        - PUT
+        - POST
+        - OPTIONS
+      allowCredentials: true
+      exposedResponseHeaders:
+        - Special-Response-Header
+      maxAge: 6000 # In seconds
+  environment:
+    CLIENT_ID: ${env:CLIENT_ID}
+    CLIENT_SECRET: ${env:CLIENT_SECRET}
+    REDIRECT_URI: ${env:REDIRECT_URI}
+    MAIN_URL: ${env:MAIN_URL}
+    AWS_ACCESS_KEY_ID_S3: ${env:AWS_ACCESS_KEY_ID_S3}
+    AWS_SECRET_ACCESS_KEY_S3: ${env:AWS_SECRET_ACCESS_KEY_S3}
+    VAPID_PUBLIC_KEY: ${env:VAPID_PUBLIC_KEY}
+    VAPID_PRIVATE_KEY: ${env:VAPID_PRIVATE_KEY}
+  timeout: 10
+
+functions:
+  auth:
+    handler: auth.handler
+  healthcheck:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /
+          method: get
+          authorizer: customAuthorizer
+  login:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /login
+          method: get
+  ftlogin:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /ftlogin
+          method: get
+  return:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /ftlogin/return
+          method: get
+  item:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /item
+          method: get
+  user:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /user
+          method: get
+      - httpApi:
+          path: /user/me
+          method: get
+  storage:
+    handler: index.handler
+    events:
+      # - schedule:
+      #     rate: rate(1 minute)
+      - httpApi:
+          path: /storage
+          method: get
+      - httpApi:
+          path: /storage
+          method: post
+      - httpApi:
+          path: /storage
+          method: put
+      - httpApi:
+          path: /storage/me
+          method: get
+  ledger:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /ledger/me
+          method: get
+  divide:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /divide/expire
+          method: get
+      # - schedule:
+      #     rate: rate(1 minute)
+      - httpApi:
+          path: /divide/share
+          method: get
+  register:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /register
+          method: post
+  notification:
+    handler: notification.handler
+    events:
+      - schedule:
+          rate: rate(1 minute)
